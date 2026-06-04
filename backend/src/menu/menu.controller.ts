@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseInterceptors, UploadedFile, BadRequestException, Body } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MenuService } from './menu.service';
 import { Types } from 'mongoose';
@@ -28,5 +28,16 @@ export class MenuController {
       throw new BadRequestException('ID de restaurante inválido');
     }
     return this.menuService.processExcelUpload(restaurantId, file.buffer);
+  }
+
+  @Post(':restaurantId/item')
+  async addItem(
+    @Param('restaurantId') restaurantId: string,
+    @Body() itemData: any,
+  ) {
+    if (!Types.ObjectId.isValid(restaurantId)) {
+      throw new BadRequestException('ID de restaurante inválido');
+    }
+    return this.menuService.addItem(restaurantId, itemData);
   }
 }

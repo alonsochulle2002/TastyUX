@@ -80,4 +80,28 @@ export class MenuService {
 
     return { message: `${importedItems.length} ítems importados exitosamente`, count: importedItems.length };
   }
+
+  async addItem(restaurantId: string, itemData: any) {
+    const objectId = new Types.ObjectId(restaurantId);
+    
+    let category = await this.categoryModel.findOne({ restaurant_id: objectId, name: itemData.category });
+    if (!category) {
+      category = await this.categoryModel.create({
+        restaurant_id: objectId,
+        name: itemData.category,
+        displayOrder: 0
+      });
+    }
+
+    const newItem = await this.itemModel.create({
+      restaurant_id: objectId,
+      category_id: category._id,
+      name: itemData.name,
+      description: itemData.description,
+      price: parseFloat(itemData.price),
+      active: true
+    });
+
+    return newItem;
+  }
 }

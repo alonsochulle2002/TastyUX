@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Param, UseInterceptors, UploadedFile, BadRequestException, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseInterceptors, UploadedFile, BadRequestException, Body, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MenuService } from './menu.service';
 import { Types } from 'mongoose';
@@ -6,6 +7,11 @@ import { Types } from 'mongoose';
 @Controller('menu')
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
+
+  @Get('template/download')
+  async downloadTemplate(@Res() res: Response) {
+    return this.menuService.generateTemplate(res);
+  }
 
   @Get(':restaurantId')
   async getMenu(@Param('restaurantId') restaurantId: string) {

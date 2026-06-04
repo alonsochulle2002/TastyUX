@@ -126,8 +126,16 @@ const AdminDashboard = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
-          <h2 className="font-semibold text-gray-800 mb-2">Carga masiva via Excel</h2>
-          <p className="text-xs text-gray-500 mb-4">Sube tu plantilla .xlsx para actualizar el menú</p>
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="font-semibold text-gray-800">Carga masiva via Excel</h2>
+            <button 
+              onClick={() => window.open('http://localhost:3000/menu/template/download', '_blank')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Descargar Plantilla
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-4 text-left">Sube tu plantilla .xlsx para actualizar el menú</p>
           
           <div
             className={`border-2 border-dashed rounded-xl p-6 transition-colors ${

@@ -104,4 +104,31 @@ export class MenuService {
 
     return newItem;
   }
+
+  async generateTemplate(res: any) {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Plantilla');
+    
+    worksheet.columns = [
+      { header: 'Nombre', key: 'name', width: 30 },
+      { header: 'Descripción', key: 'desc', width: 40 },
+      { header: 'Precio', key: 'price', width: 15 },
+      { header: 'Categoría', key: 'cat', width: 25 },
+      { header: 'URL Imagen', key: 'img', width: 40 },
+    ];
+    
+    worksheet.addRow({
+      name: 'Ej: Hamburguesa Clásica',
+      desc: 'Pan artesanal, 200g carne, queso',
+      price: 15.50,
+      cat: 'Platos Fuertes',
+      img: 'https://ejemplo.com/imagen.jpg'
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=plantilla_menu.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
 }

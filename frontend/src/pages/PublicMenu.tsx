@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Menu, Star, Phone } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Menu, Star, Phone, Home, X } from 'lucide-react';
 import api from '../services/api';
 
 interface Item {
@@ -33,6 +33,8 @@ const PublicMenu = () => {
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const updateTime = () => {
@@ -50,10 +52,11 @@ const PublicMenu = () => {
     const fetchMenu = async () => {
       try {
         const response = await api.get(`/menu/${restaurantId}`);
-        setCategories(response.data.menu || []);
+        const validCategories = (response.data.menu || []).filter((cat: any) => cat.items && cat.items.length > 0);
+        setCategories(validCategories);
         setRestaurant(response.data.restaurant);
-        if (response.data.menu && response.data.menu.length > 0) {
-          setActiveCategory(response.data.menu[0]._id);
+        if (validCategories.length > 0) {
+          setActiveCategory(validCategories[0]._id);
         }
       } catch (error) {
         console.error('Error fetching menu', error);
@@ -70,7 +73,7 @@ const PublicMenu = () => {
 
   return (
     <div className="min-h-screen bg-orange-50 pb-20 font-sans">
-      <div className="bg-[#e05626] text-white p-6 pt-10 rounded-b-[40px] shadow-lg relative overflow-hidden">
+      <div className="bg-[#e05626] text-white p-6 pt-10 rounded-b-[40px] shadow-lg relative overflow-hidden max-w-md md:max-w-3xl lg:max-w-[80%] mx-auto">
         <div className="absolute top-0 right-0 opacity-10 transform translate-x-10 -translate-y-10">
            <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
              <circle cx="100" cy="100" r="100" fill="white"/>
@@ -99,8 +102,8 @@ const PublicMenu = () => {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto mt-6 px-4">
-        <div className="flex overflow-x-auto space-x-3 pb-2 scrollbar-hide mb-4">
+      <div className="max-w-md md:max-w-3xl lg:max-w-[80%] mx-auto mt-6 px-4">
+        <div className="flex flex-wrap justify-center gap-3 pb-2 mb-4">
           {categories.map((cat) => (
             <button
               key={cat._id}
@@ -116,10 +119,15 @@ const PublicMenu = () => {
           ))}
         </div>
 
-        <div className="space-y-4 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
           {categories.find(c => c._id === activeCategory)?.items.map((item) => (
             <div key={item._id} className="bg-white rounded-2xl p-4 flex items-center shadow-sm border border-gray-100 transition-transform hover:scale-[1.02]">
-              <div className="w-16 h-16 rounded-xl bg-orange-100 flex items-center justify-center mr-4 shrink-0 overflow-hidden">
+              <div 
+                className="w-20 h-20 md:w-24 md:h-24 rounded-xl bg-orange-100 flex items-center justify-center mr-4 shrink-0 overflow-hidden cursor-pointer"
+                onClick={() => {
+                  if (item.image_url) setPreviewImage(item.image_url);
+                }}
+              >
                  {item.image_url ? (
                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                  ) : (
@@ -143,6 +151,13 @@ const PublicMenu = () => {
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around p-3 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <div 
+          onClick={() => navigate('/')} 
+          className="flex flex-col items-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+        >
+          <Home className="w-6 h-6 mb-1" />
+          <span className="text-[10px] font-medium">Inicio</span>
+        </div>
         <div className="flex flex-col items-center text-[#e05626]">
           <Menu className="w-6 h-6 mb-1" />
           <span className="text-[10px] font-bold">Menú</span>
@@ -156,6 +171,23 @@ const PublicMenu = () => {
           <span className="text-[10px] font-medium">Contacto</span>
         </div>
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50" onClick={() => setPreviewImage(null)}>
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img 
+            src={previewImage} 
+            alt="Vista previa" 
+            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+          />
+        </div>
+      )}
     </div>
   );
 };

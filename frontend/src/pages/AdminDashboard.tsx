@@ -1,21 +1,32 @@
 import { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { FileSpreadsheet, Plus, Star, X } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { FileSpreadsheet, Plus, Star, X, ArrowLeft, Pencil, Trash2, Settings } from 'lucide-react';
 import api from '../services/api';
 
 const AdminDashboard = () => {
   const { restaurantId } = useParams();
   const [restaurant, setRestaurant] = useState<any>(null);
-  const [recentItems, setRecentItems] = useState<any[]>([]);
+  const [allItems, setAllItems] = useState<any[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
 
+  // Categories Modal
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [detailedCategories, setDetailedCategories] = useState<any[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+
   const [newItem, setNewItem] = useState({ name: '', price: '', description: '', category: '' });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [newPromo, setNewPromo] = useState({ title: '', discount: '', description: '', validUntil: '' });
   const [categories, setCategories] = useState<string[]>([]);
 
@@ -25,18 +36,25 @@ const AdminDashboard = () => {
       const response = await api.get(`/menu/${restaurantId}`);
       setRestaurant(response.data.restaurant);
       
-      const allItems: any[] = [];
+      const allItemsArray: any[] = [];
       const extractedCategories: string[] = [];
+      const detailedCats: any[] = [];
+      
       if (response.data.menu) {
         response.data.menu.forEach((cat: any) => {
+          detailedCats.push({ _id: cat._id, name: cat.name, displayOrder: cat.displayOrder });
           if (cat.name && !extractedCategories.includes(cat.name)) {
             extractedCategories.push(cat.name);
           }
-          if (cat.items) allItems.push(...cat.items);
+          if (cat.items) {
+            allItemsArray.push(...cat.items.map((i: any) => ({ ...i, category: cat.name })));
+          }
         });
       }
       setCategories(extractedCategories);
-      setRecentItems(allItems.reverse().slice(0, 5));
+      setDetailedCategories(detailedCats);
+      setTotalItems(allItemsArray.length);
+      setAllItems(allItemsArray.reverse());
     } catch (error) {
       console.error('Error fetching restaurant data', error);
     }
@@ -49,13 +67,82 @@ const AdminDashboard = () => {
   const handleItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post(`/menu/${restaurantId}/item`, newItem);
-      setMessage('Ítem creado exitosamente');
+      let finalImageUrl = '';
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        const uploadRes = await api.post('/menu/upload-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        finalImageUrl = uploadRes.data.imageUrl;
+      }
+      
+      const payload = {
+        ...newItem,
+        image_url: finalImageUrl
+      };
+      
+      if (editingItem) {
+        await api.put(`/menu/${restaurantId}/item/${editingItem._id}`, payload);
+        setMessage('Ítem actualizado exitosamente');
+      } else {
+        await api.post(`/menu/${restaurantId}/item`, payload);
+        setMessage('Ítem creado exitosamente');
+      }
+      
       setIsItemModalOpen(false);
+      setEditingItem(null);
       setNewItem({ name: '', price: '', description: '', category: '' });
+      setImageFile(null);
+      setImagePreview(null);
       fetchRestaurant();
     } catch (error: any) {
-      setMessage('Error al crear ítem: ' + (error.response?.data?.message || error.message));
+      setMessage('Error al guardar ítem: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const openEditModal = (item: any) => {
+    setEditingItem(item);
+    setNewItem({
+      name: item.name,
+      price: item.price.toString(),
+      description: item.description || '',
+      category: item.category
+    });
+    setImageFile(null);
+    setImagePreview(item.image_url || null);
+    setIsItemModalOpen(true);
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName) return;
+    try {
+      await api.post(`/menu/${restaurantId}/category`, { name: newCategoryName });
+      setNewCategoryName('');
+      fetchRestaurant();
+    } catch (error: any) {
+      alert('Error: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleUpdateCategory = async (catId: string, newName: string) => {
+    try {
+      await api.put(`/menu/${restaurantId}/category/${catId}`, { name: newName });
+      setEditingCategory(null);
+      fetchRestaurant();
+    } catch (error: any) {
+      alert('Error: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleDeleteCategory = async (catId: string) => {
+    if (!window.confirm('¿Seguro que deseas eliminar esta categoría?')) return;
+    try {
+      await api.delete(`/menu/${restaurantId}/category/${catId}`);
+      fetchRestaurant();
+    } catch (error: any) {
+      alert('Error al eliminar: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -99,8 +186,16 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
-      <div className="bg-blue-700 text-white p-6 rounded-b-3xl shadow-lg flex items-center space-x-4">
-        <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-xl overflow-hidden">
+      <div className="bg-blue-700 text-white p-6 rounded-b-3xl shadow-lg relative">
+        <button 
+          onClick={() => navigate('/')}
+          className="absolute top-4 left-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          title="Volver al Inicio"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex items-center space-x-4 mt-4">
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-xl overflow-hidden">
           {restaurant?.logoUrl ? (
             <img src={restaurant.logoUrl} alt={restaurant?.name} className="w-full h-full object-cover" />
           ) : (
@@ -112,12 +207,13 @@ const AdminDashboard = () => {
           <p className="text-blue-200 text-sm">{restaurant?.name || 'Cargando...'}</p>
         </div>
       </div>
+      </div>
 
-      <div className="p-4 space-y-6 max-w-md mx-auto mt-4">
+      <div className="p-4 space-y-6 max-w-md md:max-w-4xl lg:max-w-[80%] mx-auto mt-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center">
             <span className="text-gray-500 text-xs font-medium">Items activos</span>
-            <span className="text-2xl font-bold mt-1">3</span>
+            <span className="text-2xl font-bold mt-1">{totalItems}</span>
           </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center">
             <span className="text-gray-500 text-xs font-medium">Promociones</span>
@@ -167,13 +263,25 @@ const AdminDashboard = () => {
         </div>
 
         <div>
-          <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3 uppercase">Items Recientes</h3>
-          <div className="space-y-3">
-            {recentItems.length > 0 ? (
-              recentItems.map((item, i) => (
+          <h3 className="text-xs font-bold text-gray-400 tracking-wider mb-3 uppercase">Todos los Items</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-2">
+            {allItems.length > 0 ? (
+              allItems.map((item, i) => (
                 <div key={i} className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                  <span className="font-medium text-gray-700">{item.name}</span>
-                  <span className="font-bold text-green-600">S/. {item.price.toFixed(2)}</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-gray-700">{item.name}</span>
+                    <span className="text-xs text-gray-400">{item.category}</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="font-bold text-green-600">S/. {item.price.toFixed(2)}</span>
+                    <button 
+                      onClick={() => openEditModal(item)}
+                      className="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      title="Editar Ítem"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
@@ -184,9 +292,15 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button 
-            onClick={() => setIsItemModalOpen(true)}
+            onClick={() => {
+              setEditingItem(null);
+              setNewItem({ name: '', price: '', description: '', category: '' });
+              setImageFile(null);
+              setImagePreview(null);
+              setIsItemModalOpen(true);
+            }}
             className="flex items-center justify-center space-x-2 py-3 rounded-xl border border-gray-300 text-gray-600 font-medium bg-white shadow-sm hover:bg-gray-50"
           >
             <Plus className="w-4 h-4" />
@@ -198,6 +312,13 @@ const AdminDashboard = () => {
           >
             <Star className="w-4 h-4" />
             <span>Promo</span>
+          </button>
+          <button 
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="flex items-center justify-center space-x-2 py-3 rounded-xl border border-gray-300 text-gray-600 font-medium bg-white shadow-sm hover:bg-gray-50"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Gestionar Categorías</span>
           </button>
         </div>
       </div>
@@ -212,7 +333,7 @@ const AdminDashboard = () => {
             >
               <X className="w-6 h-6" />
             </button>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Añadir Nuevo Ítem</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">{editingItem ? 'Editar Ítem' : 'Añadir Nuevo Ítem'}</h2>
             <form className="space-y-4" onSubmit={handleItemSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del producto</label>
@@ -262,6 +383,25 @@ const AdminDashboard = () => {
                   value={newItem.description}
                   onChange={(e) => setNewItem({...newItem, description: e.target.value})}
                 ></textarea>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagen (Opcional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setImageFile(e.target.files[0]);
+                      setImagePreview(URL.createObjectURL(e.target.files[0]));
+                    }
+                  }}
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {imagePreview && (
+                  <div className="mt-2 w-20 h-20 rounded-xl overflow-hidden border border-gray-200">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
               <button 
                 type="submit"
@@ -336,6 +476,83 @@ const AdminDashboard = () => {
                 Crear Promoción
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal para Gestionar Categorías */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 relative shadow-xl max-h-[80vh] flex flex-col">
+            <button 
+              onClick={() => setIsCategoryModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Categorías</h2>
+            
+            {/* Listado de categorías */}
+            <div className="space-y-3 overflow-y-auto mb-6 flex-1">
+              {detailedCategories.map((cat, i) => (
+                <div key={cat._id || i} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  {editingCategory === cat._id ? (
+                    <input 
+                      type="text" 
+                      className="flex-1 border border-blue-300 rounded-lg px-3 py-1 mr-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      defaultValue={cat.name}
+                      onBlur={(e) => handleUpdateCategory(cat._id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleUpdateCategory(cat._id, e.currentTarget.value);
+                        if (e.key === 'Escape') setEditingCategory(null);
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="font-medium text-gray-700">{cat.name}</span>
+                  )}
+                  
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => setEditingCategory(cat._id)}
+                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                      title="Editar Nombre"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteCategory(cat._id)}
+                      className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      title="Eliminar Categoría"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {detailedCategories.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">No hay categorías.</p>
+              )}
+            </div>
+
+            {/* Crear nueva categoría */}
+            <div className="pt-4 border-t border-gray-100">
+              <form className="flex space-x-2" onSubmit={handleCreateCategory}>
+                <input 
+                  type="text" 
+                  className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  placeholder="Nueva categoría..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  required
+                />
+                <button 
+                  type="submit"
+                  className="bg-blue-600 text-white font-bold rounded-xl px-4 py-2 hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

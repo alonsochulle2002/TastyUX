@@ -99,10 +99,87 @@ export class MenuService {
       name: itemData.name,
       description: itemData.description,
       price: parseFloat(itemData.price),
+      image_url: itemData.image_url,
       active: true
     });
 
     return newItem;
+  }
+
+  async updateItem(restaurantId: string, itemId: string, itemData: any) {
+    const resId = new Types.ObjectId(restaurantId);
+    
+    let updatePayload: any = {
+      name: itemData.name,
+      description: itemData.description,
+      price: parseFloat(itemData.price),
+    };
+
+    if (itemData.image_url !== undefined) {
+      updatePayload.image_url = itemData.image_url;
+    }
+
+    if (itemData.category) {
+      let category = await this.categoryModel.findOne({ restaurant_id: resId, name: itemData.category });
+      if (!category) {
+        category = await this.categoryModel.create({
+          restaurant_id: resId,
+          name: itemData.category,
+          displayOrder: 0
+        });
+      }
+      updatePayload.category_id = category._id;
+    }
+
+    const updatedItem = await this.itemModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(itemId), restaurant_id: resId },
+      updatePayload,
+      { new: true }
+    );
+
+    if (!updatedItem) {
+      throw new BadRequestException('Ítem no encontrado');
+    }
+
+    return updatedItem;
+  }
+
+  async getCategories(restaurantId: string) {
+    return this.categoryModel.find({ restaurant_id: new Types.ObjectId(restaurantId) }).sort({ displayOrder: 1 }).exec();
+  }
+
+  async createCategory(restaurantId: string, data: any) {
+    return this.categoryModel.create({
+      restaurant_id: new Types.ObjectId(restaurantId),
+      name: data.name,
+      displayOrder: data.displayOrder || 0
+    });
+  }
+
+  async updateCategory(restaurantId: string, categoryId: string, data: any) {
+    const updated = await this.categoryModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(categoryId), restaurant_id: new Types.ObjectId(restaurantId) },
+      { name: data.name, displayOrder: data.displayOrder },
+      { new: true }
+    );
+    if (!updated) throw new BadRequestException('Categoría no encontrada');
+    return updated;
+  }
+
+  async deleteCategory(restaurantId: string, categoryId: string) {
+    const catId = new Types.ObjectId(categoryId);
+    const resId = new Types.ObjectId(restaurantId);
+
+    // Check if there are items in this category
+    const itemsCount = await this.itemModel.countDocuments({ category_id: catId, restaurant_id: resId });
+    if (itemsCount > 0) {
+      throw new BadRequestException('No se puede eliminar la categoría porque tiene ítems asociados.');
+    }
+
+    const deleted = await this.categoryModel.findOneAndDelete({ _id: catId, restaurant_id: resId });
+    if (!deleted) throw new BadRequestException('Categoría no encontrada');
+    
+    return { success: true };
   }
 
   async generateTemplate(res: any) {

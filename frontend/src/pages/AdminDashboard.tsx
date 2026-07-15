@@ -225,7 +225,7 @@ const AdminDashboard = () => {
           <div className="flex justify-between items-center mb-2">
             <h2 className="font-semibold text-gray-800">Carga masiva via Excel</h2>
             <button 
-              onClick={() => window.open('http://localhost:3000/menu/template/download', '_blank')}
+              onClick={() => window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/menu/template/download`, '_blank')}
               className="text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
             >
               Descargar Plantilla

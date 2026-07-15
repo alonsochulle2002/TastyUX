@@ -7,7 +7,7 @@ import { MenuModule } from './menu/menu.module';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/restaurante_db'),
+    MongooseModule.forRoot(process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/restaurante_db'),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',

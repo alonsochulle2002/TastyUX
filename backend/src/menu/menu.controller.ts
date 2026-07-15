@@ -117,8 +117,9 @@ export class MenuController {
     if (!file) {
       throw new BadRequestException('No se ha proporcionado imagen');
     }
+    const baseUrl = process.env.API_URL || 'http://localhost:3000';
     return {
-      imageUrl: `http://localhost:3000/uploads/${file.filename}`
+      imageUrl: `${baseUrl}/uploads/${file.filename}`
     };
   }
 }
